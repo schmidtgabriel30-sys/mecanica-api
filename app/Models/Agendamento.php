@@ -12,7 +12,29 @@ class Agendamento extends Model
 
     public const PERIODOS = ['manha', 'tarde', 'noite'];
 
-    public const STATUS = ['pendente', 'confirmado', 'concluido', 'cancelado'];
+    public const PENDENTE = 'pendente';
+
+    public const CONFIRMADO = 'confirmado';
+
+    public const CONCLUIDO = 'concluido';
+
+    public const CANCELADO = 'cancelado';
+
+    public const STATUS = [self::PENDENTE, self::CONFIRMADO, self::CONCLUIDO, self::CANCELADO];
+
+    /** Status que ainda ocupam a agenda (o serviço não terminou). */
+    public const STATUS_EM_ABERTO = [self::PENDENTE, self::CONFIRMADO];
+
+    /** Status finais: o agendamento não pode mais ser alterado. */
+    public const STATUS_FINAIS = [self::CONCLUIDO, self::CANCELADO];
+
+    /** Para quais status cada status pode mudar. */
+    public const TRANSICOES = [
+        self::PENDENTE => [self::CONFIRMADO, self::CANCELADO],
+        self::CONFIRMADO => [self::CONCLUIDO, self::CANCELADO],
+        self::CONCLUIDO => [],
+        self::CANCELADO => [],
+    ];
 
     protected $fillable = [
         'user_id',
@@ -28,7 +50,7 @@ class Agendamento extends Model
     protected function casts(): array
     {
         return [
-            'data_agendamento' => 'date',
+            'data_agendamento' => 'date:Y-m-d',
         ];
     }
 

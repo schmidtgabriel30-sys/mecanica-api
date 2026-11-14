@@ -1,58 +1,143 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Mecânica API — Aurum Automotive
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+API REST em **Laravel 13** para a oficina Aurum Automotive. Clientes cadastram seus veículos e agendam serviços. O administrador gerencia o catálogo de serviços e a equipe de mecânicos, e conduz cada agendamento até a conclusão.
 
-## About Laravel
+Projeto integrado das disciplinas de **Programação Orientada a Objetos para Web**, **Paradigmas de Linguagem de Programação** e **Programação para Dispositivos Móveis** (o app Flutter que consome esta API está em [aurum_lib](https://github.com/schmidtgabriel30-sys/aurum_lib)).
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+**Aluno:** _[seu nome completo aqui]_
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Recursos
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+| Recurso | Rotas | Quem pode |
+|---|---|---|
+| Autenticação | `POST /register`, `POST /login`, `POST /logout`, `GET /user` | público / logado |
+| Serviços | `apiResource /servicos` | listar e ver: público · criar, editar e excluir: admin |
+| Mecânicos | `apiResource /mecanicos` | listar e ver: logado · criar, editar e excluir: admin |
+| Veículos | `apiResource /veiculos` | cada cliente, só os próprios |
+| Agendamentos | `apiResource /agendamentos` | cliente: os próprios · admin: todos |
 
-## Learning Laravel
+Todas as rotas ficam sob o prefixo `/api`. As rotas protegidas exigem o cabeçalho `Authorization: Bearer {token}` (Laravel Sanctum).
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Regras de negócio
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+**Agendamentos**
+- O status segue o fluxo **pendente → confirmado → concluído**. Pendentes e confirmados também podem ir para **cancelado**.
+- Concluídos e cancelados não podem mais ser alterados. Concluídos não podem ser excluídos.
+- O **cliente** só pode reagendar (data e período) enquanto o agendamento estiver pendente, ou cancelá-lo. Não escolhe mecânico nem confirma.
+- O **admin** atribui o mecânico e muda o status.
+- No mesmo dia e período: o veículo só pode ter um agendamento, o mecânico só pode atender um, e há no máximo **5** agendamentos.
+- A data não pode estar no passado. O período é `manha`, `tarde` ou `noite`.
+- O veículo precisa pertencer ao cliente, e o serviço precisa estar ativo. Ambos não mudam na edição.
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+**Outros recursos**
+- **Veículos:** a placa é única e normalizada (`abc-1d23` → `ABC1D23`). Um veículo com agendamento em aberto não pode ser excluído (409).
+- **Serviços:** um serviço já usado em agendamentos não pode ser excluído (409); nesse caso, deve ser desativado com `ativo: false`.
+- **Listagens:** serviços e mecânicos inativos não aparecem.
 
-## Agentic Development
+## Arquitetura
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+A requisição passa por camadas com responsabilidades separadas:
 
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+```
+Rota → FormRequest → Controller → Service → Repository (interface) → Eloquent Model → Banco
+          valida       autoriza     regras      acesso aos dados
+                       (Policy)     de negócio
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+```
+app/
+├── Exceptions/RegraDeNegocioException.php   # erro de regra → JSON com status HTTP (ex.: 409)
+├── Http/
+│   ├── Controllers/       # só HTTP: recebe, autoriza com Gate/Policy, chama o Service, responde
+│   └── Requests/          # validação dos dados de entrada
+├── Models/                # entidades Eloquent, relacionamentos e constantes de domínio
+├── Policies/              # quem pode ver/alterar cada registro
+├── Repositories/
+│   ├── Contracts/         # interfaces (o que o Service pode pedir ao banco)
+│   └── Eloquent/          # implementações; BaseRepository reúne o CRUD comum
+├── Services/              # regras de negócio (AuthService, AgendamentoService, ...)
+└── Providers/RepositoryServiceProvider.php  # liga cada interface à sua implementação
+```
 
-## Contributing
+**Por que assim?**
+- **Controllers** finos: não sabem como os dados são salvos nem quais são as regras.
+- **Services** concentram as regras e dependem só das **interfaces** dos repositórios (inversão de dependência). Por isso podem ser testados com um repositório falso, como em `tests/Unit/AgendamentoServiceTest.php`.
+- **Repositories** isolam as consultas. O `BaseRepository` evita repetir `create`, `update` e `delete`, e o `AgendamentoRepository` reaproveita uma consulta base (`ativosNoPeriodo`) nas três verificações de conflito de agenda.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Como rodar
 
-## Code of Conduct
+Pré-requisitos: PHP 8.4+ e Composer. Docker é opcional, só para usar MySQL.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+1. Instale as dependências:
 
-## Security Vulnerabilities
+   ```bash
+   composer install
+   ```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+2. Crie o arquivo de ambiente e gere a chave da aplicação:
 
-## License
+   ```bash
+   cp .env.example .env
+   ```
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+   ```bash
+   php artisan key:generate
+   ```
+
+3. Escolha o banco:
+   - **SQLite** (padrão, sem instalar nada):
+
+     ```bash
+     touch database/database.sqlite
+     ```
+
+   - **MySQL via Docker:** suba o banco com `docker compose up -d` e, no `.env`, use `DB_CONNECTION=mysql`, `DB_HOST=127.0.0.1`, `DB_PORT=3309`, `DB_DATABASE=mecanica_db`, `DB_USERNAME=mecanica_user` e `DB_PASSWORD=root`. O Adminer fica em http://localhost:8041.
+
+4. Crie as tabelas e os dados de exemplo:
+
+   ```bash
+   php artisan migrate --seed
+   ```
+
+5. Inicie o servidor (http://localhost:8000):
+
+   ```bash
+   php artisan serve
+   ```
+
+### Usuários criados pelo seeder
+
+| Perfil | E-mail | Senha |
+|---|---|---|
+| Admin | `admin@aurum.com` | `12345678` |
+| Cliente | `cliente@aurum.com` | `12345678` |
+
+O seeder também cria 4 serviços, 3 mecânicos, 2 veículos do cliente e 2 agendamentos.
+
+## Testando a API
+
+### rest.http
+
+O arquivo [`rest.http`](rest.http) tem 26 requisições, em ordem, cobrindo login, CRUD de todos os recursos, segurança (401/403) e as regras de negócio (409/422). No VS Code, use a extensão **REST Client**: rode o item 01 e o 02 (logins) e depois os demais.
+
+### Testes automatizados
+
+```bash
+php artisan test
+```
+
+São 38 testes:
+- `tests/Feature`: autenticação, CRUD, permissões e regras de negócio, via HTTP;
+- `tests/Unit`: regras do `AgendamentoService` com o repositório substituído por um mock.
+
+## Banco de dados
+
+| Tabela | Campos principais | Relações |
+|---|---|---|
+| `users` | name, email, password, is_admin | 1:N veículos, 1:N agendamentos |
+| `veiculos` | marca, modelo, placa (única), ano | N:1 user · 1:N agendamentos |
+| `servicos` | nome, descricao, preco, duracao_minutos, ativo | 1:N agendamentos |
+| `mecanicos` | nome, especialidade, telefone, ativo | 1:N agendamentos |
+| `agendamentos` | data_agendamento, periodo, status, observacoes | N:1 user, veículo, serviço e mecânico (opcional) |
+
+Cada model tem uma **factory**, usada pelo seeder e pelos testes.

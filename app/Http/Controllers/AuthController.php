@@ -4,47 +4,28 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
-use App\Models\User;
+use App\Services\AuthService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Http\Response;
 
 class AuthController extends Controller
 {
-    public function register(RegisterRequest $request)
+    public function __construct(private readonly AuthService $auth) {}
+
+    public function register(RegisterRequest $request): JsonResponse
     {
-        $data = $request->validated();
-
-        $user = User::create([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'password' => Hash::make($data['password']),
-        ]);
-
-        return response()->json([
-            'token' => $user->createToken('app')->plainTextToken,
-            'user' => $user,
-        ], 201);
+        return response()->json($this->auth->registrar($request->validated()), 201);
     }
 
-    public function login(LoginRequest $request)
+    public function login(LoginRequest $request): JsonResponse
     {
-        $data = $request->validated();
-
-        $user = User::where('email', $data['email'])->first();
-
-        if (! $user || ! Hash::check($data['password'], $user->password)) {
-            return response()->json(['message' => 'Credenciais inválidas'], 401);
-        }
-
-        return [
-            'token' => $user->createToken('app')->plainTextToken,
-            'user' => $user,
-        ];
+        return response()->json($this->auth->login($request->validated('email'), $request->validated('password')));
     }
 
-    public function logout(Request $request)
+    public function logout(Request $request): Response
     {
-        $request->user()->currentAccessToken()->delete();
+        $this->auth->logout($request->user());
 
         return response()->noContent();
     }
