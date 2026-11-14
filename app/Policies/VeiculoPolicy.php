@@ -1,0 +1,24 @@
+<?php
+
+namespace App\Policies;
+
+use App\Models\User;
+use App\Models\Veiculo;
+
+class VeiculoPolicy
+{
+    public function view(User $user, Veiculo $veiculo): bool
+    {
+        return (int) $user->id === (int) $veiculo->user_id;
+    }
+
+    public function update(User $user, Veiculo $veiculo): bool
+    {
+        return $this->view($user, $veiculo);
+    }
+
+    public function delete(User $user, Veiculo $veiculo): bool
+    {
+        return $this->view($user, $veiculo);
+    }
+}

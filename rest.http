@@ -1,0 +1,196 @@
+@host = http://localhost:8000/api
+@adminToken = {{loginAdmin.response.body.token}}
+@clienteToken = {{loginCliente.response.body.token}}
+
+
+############################ AUTENTICAÇÃO ############################
+
+### 01 | LOGIN ADMIN (rodar primeiro)
+# @name loginAdmin
+POST {{host}}/login
+Content-Type: application/json
+Accept: application/json
+
+{ "email": "admin@aurum.com", "password": "12345678" }
+
+### 02 | LOGIN CLIENTE (rodar em seguida)
+# @name loginCliente
+POST {{host}}/login
+Content-Type: application/json
+Accept: application/json
+
+{ "email": "cliente@aurum.com", "password": "12345678" }
+
+### 03 | SEGURANÇA: sem token (esperado 401)
+GET {{host}}/veiculos
+Accept: application/json
+
+############################ SERVIÇOS ############################
+
+### 04 | SERVIÇOS: listar (público)
+GET {{host}}/servicos
+Accept: application/json
+
+### 05 | SERVIÇOS: cliente tenta criar (esperado 403)
+POST {{host}}/servicos
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{clienteToken}}
+
+{ "nome": "Não autorizado", "preco": 10, "duracao_minutos": 30 }
+
+### 06 | SERVIÇOS: admin cria (201)
+# @name novoServico
+POST {{host}}/servicos
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{adminToken}}
+
+{ "nome": "Alinhamento e balanceamento", "descricao": "Alinhamento das 4 rodas", "preco": 120.00, "duracao_minutos": 60 }
+
+### 07 | SERVIÇOS: admin atualiza
+PUT {{host}}/servicos/{{novoServico.response.body.id}}
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{adminToken}}
+
+{ "preco": 130.00 }
+
+### 08 | SERVIÇOS: admin exclui (204)
+DELETE {{host}}/servicos/{{novoServico.response.body.id}}
+Accept: application/json
+Authorization: Bearer {{adminToken}}
+
+############################ MECÂNICOS ############################
+
+### 09 | MECÂNICOS: listar
+GET {{host}}/mecanicos
+Accept: application/json
+Authorization: Bearer {{clienteToken}}
+
+### 10 | MECÂNICOS: admin cria (201)
+# @name novoMecanico
+POST {{host}}/mecanicos
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{adminToken}}
+
+{ "nome": "Carlos Pereira", "especialidade": "Motor", "telefone": "(42) 99999-0000" }
+
+### 11 | MECÂNICOS: admin exclui (204)
+DELETE {{host}}/mecanicos/{{novoMecanico.response.body.id}}
+Accept: application/json
+Authorization: Bearer {{adminToken}}
+
+############################ VEÍCULOS ############################
+
+### 12 | VEÍCULOS: listar os meus
+GET {{host}}/veiculos
+Accept: application/json
+Authorization: Bearer {{clienteToken}}
+
+### 13 | VEÍCULOS: cadastrar (201)
+# @name novoVeiculo
+POST {{host}}/veiculos
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{clienteToken}}
+
+{ "marca": "Fiat", "modelo": "Argo", "placa": "TST{{$randomInt 1000 9999}}", "ano": 2022 }
+
+### 14 | VEÍCULOS: placa repetida (esperado 422)
+POST {{host}}/veiculos
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{clienteToken}}
+
+{ "marca": "Fiat", "modelo": "Mobi", "placa": "{{novoVeiculo.response.body.placa}}", "ano": 2021 }
+
+### 15 | SEGURANÇA: admin acessa veículo de outro usuário (esperado 403)
+GET {{host}}/veiculos/1
+Accept: application/json
+Authorization: Bearer {{adminToken}}
+
+############################ AGENDAMENTOS ############################
+
+### 16 | AGENDAMENTOS: criar (201)
+# @name novoAgendamento
+POST {{host}}/agendamentos
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{clienteToken}}
+
+{ "veiculo_id": 1, "servico_id": 4, "data_agendamento": "2027-03-15", "periodo": "tarde", "observacoes": "Barulho na suspensão" }
+
+### 17 | REGRA: mesmo veículo, dia e período (esperado 422)
+POST {{host}}/agendamentos
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{clienteToken}}
+
+{ "veiculo_id": 1, "servico_id": 2, "data_agendamento": "2027-03-15", "periodo": "tarde" }
+
+### 18 | REGRA: data no passado (esperado 422)
+POST {{host}}/agendamentos
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{clienteToken}}
+
+{ "veiculo_id": 1, "servico_id": 2, "data_agendamento": "2026-01-10", "periodo": "manha" }
+
+### 19 | REGRA: cliente tenta confirmar (esperado 422)
+PUT {{host}}/agendamentos/{{novoAgendamento.response.body.id}}
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{clienteToken}}
+
+{ "status": "confirmado" }
+
+### 20 | FLUXO: admin confirma e atribui mecânico
+PUT {{host}}/agendamentos/{{novoAgendamento.response.body.id}}
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{adminToken}}
+
+{ "status": "confirmado", "mecanico_id": 1 }
+
+### 21 | FLUXO: admin conclui
+PUT {{host}}/agendamentos/{{novoAgendamento.response.body.id}}
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{adminToken}}
+
+{ "status": "concluido" }
+
+### 22 | REGRA: alterar agendamento concluído (esperado 422)
+PUT {{host}}/agendamentos/{{novoAgendamento.response.body.id}}
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{adminToken}}
+
+{ "periodo": "manha" }
+
+### 23 | FLUXO: cliente cancela o próprio agendamento
+PUT {{host}}/agendamentos/2
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{clienteToken}}
+
+{ "status": "cancelado" }
+
+### 24 | REGRA: excluir serviço em uso (esperado 409)
+DELETE {{host}}/servicos/4
+Accept: application/json
+Authorization: Bearer {{adminToken}}
+
+### 25 | REGRA: excluir veículo com agendamento em aberto (esperado 409)
+DELETE {{host}}/veiculos/1
+Accept: application/json
+Authorization: Bearer {{clienteToken}}
+
+############################ ENCERRAMENTO ############################
+
+### 26 | LOGOUT (204)
+POST {{host}}/logout
+Accept: application/json
+Authorization: Bearer {{clienteToken}}
