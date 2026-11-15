@@ -14,9 +14,12 @@ use Illuminate\Validation\ValidationException;
  * Regras de negócio dos agendamentos.
  *
  * - Cliente vê e altera só os próprios agendamentos; admin vê todos.
- * - Só o admin escolhe o mecânico e confirma/conclui.
+ * - Só o admin escolhe o mecânico e muda o status (aceitar, iniciar o
+ *   atendimento, concluir ou recusar).
  * - O cliente pode reagendar enquanto estiver pendente, ou cancelar.
- * - Status seguem um fluxo: pendente → confirmado → concluído (ou cancelado).
+ * - Status seguem um fluxo:
+ *   pendente → confirmado → em atendimento → concluído
+ *   (pendente e confirmado também podem ir para cancelado).
  * - Por dia e período: um veículo uma vez, um mecânico uma vez,
  *   e no máximo LIMITE_POR_PERIODO agendamentos.
  */
@@ -24,13 +27,18 @@ class AgendamentoService
 {
     public const LIMITE_POR_PERIODO = 5;
 
+    public const POR_PAGINA_PADRAO = 10;
+
+    public const POR_PAGINA_MAXIMO = 50;
+
     public function __construct(private readonly AgendamentoRepositoryInterface $agendamentos) {}
 
-    public function listar(User $user, ?string $status): LengthAwarePaginator
+    public function listar(User $user, ?string $status, ?int $porPagina = null): LengthAwarePaginator
     {
         return $this->agendamentos->paginar(
             $user->is_admin ? null : $user->id,
             $status,
+            min($porPagina ?: self::POR_PAGINA_PADRAO, self::POR_PAGINA_MAXIMO),
         );
     }
 
@@ -92,8 +100,8 @@ class AgendamentoService
 
     public function excluir(Agendamento $agendamento): void
     {
-        if ($agendamento->status === Agendamento::CONCLUIDO) {
-            throw new RegraDeNegocioException('Agendamentos concluídos não podem ser excluídos.');
+        if (in_array($agendamento->status, Agendamento::STATUS_NAO_EXCLUIVEIS, true)) {
+            throw new RegraDeNegocioException('Agendamentos em atendimento ou concluídos não podem ser excluídos.');
         }
 
         $this->agendamentos->delete($agendamento);

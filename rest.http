@@ -5,13 +5,13 @@
 
 ############################ AUTENTICAÇÃO ############################
 
-### 01 | LOGIN ADMIN (rodar primeiro)
+### 01 | LOGIN ADMIN fixo — usuário AdminA, senha AdminA (rodar primeiro)
 # @name loginAdmin
 POST {{host}}/login
 Content-Type: application/json
 Accept: application/json
 
-{ "email": "admin@aurum.com", "password": "12345678" }
+{ "login": "AdminA", "password": "AdminA" }
 
 ### 02 | LOGIN CLIENTE (rodar em seguida)
 # @name loginCliente
@@ -146,7 +146,7 @@ Authorization: Bearer {{clienteToken}}
 
 { "status": "confirmado" }
 
-### 20 | FLUXO: admin confirma e atribui mecânico
+### 20 | FLUXO: admin aceita (confirma) e atribui mecânico
 PUT {{host}}/agendamentos/{{novoAgendamento.response.body.id}}
 Content-Type: application/json
 Accept: application/json
@@ -154,13 +154,26 @@ Authorization: Bearer {{adminToken}}
 
 { "status": "confirmado", "mecanico_id": 1 }
 
-### 21 | FLUXO: admin conclui
+### 21a | FLUXO: admin inicia o atendimento
+PUT {{host}}/agendamentos/{{novoAgendamento.response.body.id}}
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{adminToken}}
+
+{ "status": "em_atendimento" }
+
+### 21b | FLUXO: admin conclui
 PUT {{host}}/agendamentos/{{novoAgendamento.response.body.id}}
 Content-Type: application/json
 Accept: application/json
 Authorization: Bearer {{adminToken}}
 
 { "status": "concluido" }
+
+### 21c | ADMIN: todos os agendamentos pendentes, com os dados do cliente
+GET {{host}}/agendamentos?status=pendente&per_page=50
+Accept: application/json
+Authorization: Bearer {{adminToken}}
 
 ### 22 | REGRA: alterar agendamento concluído (esperado 422)
 PUT {{host}}/agendamentos/{{novoAgendamento.response.body.id}}

@@ -13,12 +13,8 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        User::factory()->create([
-            'name' => 'Administrador',
-            'email' => 'admin@aurum.com',
-            'password' => '12345678',
-            'is_admin' => true,
-        ]);
+        // Administrador fixo: usuário AdminA, senha AdminA.
+        $this->call(AdminSeeder::class);
 
         $cliente = User::factory()->create([
             'name' => 'João Silva',
@@ -33,18 +29,43 @@ class DatabaseSeeder extends Seeder
             ['nome' => 'Revisão preventiva completa', 'descricao' => 'Óleo, filtro, check-up e diagnóstico', 'preco' => 249.90, 'duracao_minutos' => 120],
         ])->map(fn (array $s) => Servico::create($s));
 
-        $mecanicos = Mecanico::factory(3)->create();
+        foreach ([
+            ['Carlos Pereira', 'Motor e injeção eletrônica', '11988887777'],
+            ['Ana Souza', 'Freios e suspensão', '11977776666'],
+            ['Roberto Lima', 'Elétrica automotiva', '11966665555'],
+        ] as [$nome, $especialidade, $telefone]) {
+            Mecanico::create(['nome' => $nome, 'especialidade' => $especialidade, 'telefone' => $telefone]);
+        }
 
-        $veiculos = Veiculo::factory(2)->create(['user_id' => $cliente->id]);
+        $maria = User::factory()->create([
+            'name' => 'Maria Oliveira',
+            'email' => 'maria@aurum.com',
+            'password' => '12345678',
+        ]);
 
-        foreach ($veiculos as $i => $veiculo) {
+        // Solicitações pendentes, aguardando o admin aceitar.
+        $pedidos = [
+            [$cliente, 'Volkswagen', 'Gol', 'Revisão preventiva completa', 2, 'manha', 'Luz do motor acendeu no painel.'],
+            [$cliente, 'Honda', 'Civic', 'Troca de óleo e filtro', 3, 'tarde', null],
+            [$maria, 'Fiat', 'Argo', 'Diagnóstico eletrônico', 2, 'tarde', 'Barulho ao frear.'],
+        ];
+
+        foreach ($pedidos as [$dono, $marca, $modelo, $servico, $dias, $periodo, $obs]) {
+            $veiculo = Veiculo::factory()->create([
+                'user_id' => $dono->id,
+                'marca' => $marca,
+                'modelo' => $modelo,
+            ]);
+
             Agendamento::factory()->create([
-                'user_id' => $cliente->id,
+                'user_id' => $dono->id,
                 'veiculo_id' => $veiculo->id,
-                'servico_id' => $servicos->random()->id,
-                'mecanico_id' => $mecanicos->random()->id,
-                'data_agendamento' => now()->addDays($i + 2)->toDateString(),
-                'periodo' => 'manha',
+                'servico_id' => $servicos->firstWhere('nome', $servico)->id,
+                'mecanico_id' => null,
+                'data_agendamento' => now()->addDays($dias)->toDateString(),
+                'periodo' => $periodo,
+                'status' => 'pendente',
+                'observacoes' => $obs,
             ]);
         }
     }

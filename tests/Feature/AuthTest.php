@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use Database\Seeders\AdminSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -49,6 +50,32 @@ class AuthTest extends TestCase
         $this->postJson('/api/login', ['email' => 'joao@email.com', 'password' => '12345678'])
             ->assertOk()
             ->assertJsonStructure(['token', 'user']);
+    }
+
+    public function test_admin_fixo_entra_com_usuario_e_senha_admina(): void
+    {
+        $this->seed(AdminSeeder::class);
+
+        $this->postJson('/api/login', ['login' => 'AdminA', 'password' => 'AdminA'])
+            ->assertOk()
+            ->assertJsonPath('user.is_admin', true)
+            ->assertJsonPath('user.username', 'AdminA');
+    }
+
+    public function test_admin_seeder_pode_rodar_de_novo_sem_duplicar(): void
+    {
+        $this->seed(AdminSeeder::class);
+        $this->seed(AdminSeeder::class);
+
+        $this->assertDatabaseCount('users', 1);
+    }
+
+    public function test_login_aceita_o_campo_login_com_email(): void
+    {
+        User::factory()->create(['email' => 'joao@email.com', 'password' => '12345678']);
+
+        $this->postJson('/api/login', ['login' => 'joao@email.com', 'password' => '12345678'])
+            ->assertOk()->assertJsonPath('user.is_admin', false);
     }
 
     public function test_login_com_senha_errada_retorna_401(): void

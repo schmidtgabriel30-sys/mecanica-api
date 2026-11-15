@@ -21,7 +21,11 @@ class AgendamentoController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        return response()->json($this->service->listar($request->user(), $request->query('status')));
+        return response()->json($this->service->listar(
+            $request->user(),
+            $request->query('status'),
+            $request->integer('per_page'),
+        ));
     }
 
     public function store(AgendamentoRequest $request): JsonResponse

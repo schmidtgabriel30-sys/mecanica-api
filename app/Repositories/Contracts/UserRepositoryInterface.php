@@ -6,5 +6,8 @@ use App\Models\User;
 
 interface UserRepositoryInterface extends BaseRepositoryInterface
 {
-    public function findByEmail(string $email): ?User;
+    /**
+     * Busca pelo e-mail ou pelo nome de usuário.
+     */
+    public function findByLogin(string $login): ?User;
 }

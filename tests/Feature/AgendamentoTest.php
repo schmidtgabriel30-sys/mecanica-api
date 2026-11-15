@@ -165,7 +165,7 @@ class AgendamentoTest extends TestCase
             ->assertUnprocessable()->assertJsonValidationErrors('status');
     }
 
-    public function test_fluxo_do_admin_confirma_e_conclui(): void
+    public function test_fluxo_do_admin_aceita_atende_e_conclui(): void
     {
         $mecanico = Mecanico::factory()->create(['ativo' => true]);
         $agendamento = Agendamento::factory()->create(['status' => 'pendente', 'mecanico_id' => null]);
@@ -173,12 +173,44 @@ class AgendamentoTest extends TestCase
 
         $this->putJson("/api/agendamentos/{$agendamento->id}", ['status' => 'confirmado', 'mecanico_id' => $mecanico->id])
             ->assertOk()->assertJsonPath('status', 'confirmado')->assertJsonPath('mecanico.id', $mecanico->id);
+
+        // não pula etapas: confirmado → concluído direto é recusado
+        $this->putJson("/api/agendamentos/{$agendamento->id}", ['status' => 'concluido'])
+            ->assertUnprocessable()->assertJsonValidationErrors('status');
+
+        $this->putJson("/api/agendamentos/{$agendamento->id}", ['status' => 'em_atendimento'])
+            ->assertOk()->assertJsonPath('status', 'em_atendimento');
+
+        // em atendimento não pode ser cancelado nem excluído
+        $this->putJson("/api/agendamentos/{$agendamento->id}", ['status' => 'cancelado'])->assertUnprocessable();
+        $this->deleteJson("/api/agendamentos/{$agendamento->id}")->assertStatus(409);
+
         $this->putJson("/api/agendamentos/{$agendamento->id}", ['status' => 'concluido'])
             ->assertOk()->assertJsonPath('status', 'concluido');
 
         // concluído não pode mais ser alterado nem excluído
         $this->putJson("/api/agendamentos/{$agendamento->id}", ['periodo' => 'tarde'])->assertUnprocessable();
         $this->deleteJson("/api/agendamentos/{$agendamento->id}")->assertStatus(409);
+    }
+
+    public function test_admin_ve_quem_solicitou(): void
+    {
+        Agendamento::factory()->create(['user_id' => $this->cliente->id, 'veiculo_id' => $this->veiculo->id]);
+
+        $this->actingAs($this->admin())->getJson('/api/agendamentos')
+            ->assertJsonPath('data.0.cliente.name', $this->cliente->name)
+            ->assertJsonPath('data.0.cliente.email', $this->cliente->email)
+            ->assertJsonMissingPath('data.0.cliente.password');
+    }
+
+    public function test_admin_pode_pedir_mais_itens_por_pagina(): void
+    {
+        Agendamento::factory(12)->create();
+
+        $this->actingAs($this->admin())->getJson('/api/agendamentos?per_page=30')
+            ->assertJsonPath('per_page', 30)->assertJsonCount(12, 'data');
+        $this->actingAs($this->admin())->getJson('/api/agendamentos?per_page=500')
+            ->assertJsonPath('per_page', 50);
     }
 
     public function test_transicao_invalida_de_status(): void

@@ -32,11 +32,12 @@ class AuthService
     }
 
     /**
+     * @param  string  $login  e-mail ou nome de usuário
      * @return array{token: string, user: User}
      */
-    public function login(string $email, string $senha): array
+    public function login(string $login, string $senha): array
     {
-        $user = $this->users->findByEmail($email);
+        $user = $this->users->findByLogin($login);
 
         if (! $user || ! Hash::check($senha, $user->password)) {
             throw new RegraDeNegocioException('Credenciais inválidas', 401);

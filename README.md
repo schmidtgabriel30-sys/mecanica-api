@@ -21,10 +21,10 @@ Todas as rotas ficam sob o prefixo `/api`. As rotas protegidas exigem o cabeçal
 ## Regras de negócio
 
 **Agendamentos**
-- O status segue o fluxo **pendente → confirmado → concluído**. Pendentes e confirmados também podem ir para **cancelado**.
-- Concluídos e cancelados não podem mais ser alterados. Concluídos não podem ser excluídos.
+- O status segue o fluxo **pendente → confirmado → em atendimento → concluído**, sem pular etapas. Pendentes e confirmados também podem ir para **cancelado**.
+- Concluídos e cancelados não podem mais ser alterados. Em atendimento e concluídos não podem ser excluídos.
 - O **cliente** só pode reagendar (data e período) enquanto o agendamento estiver pendente, ou cancelá-lo. Não escolhe mecânico nem confirma.
-- O **admin** atribui o mecânico e muda o status.
+- O **admin** vê os agendamentos de todos os clientes (com nome e e-mail de quem solicitou), aceita ou recusa, atribui o mecânico, inicia o atendimento e conclui. Na listagem pode pedir até 50 por página (`?per_page=50`) e filtrar por situação (`?status=pendente`).
 - No mesmo dia e período: o veículo só pode ter um agendamento, o mecânico só pode atender um, e há no máximo **5** agendamentos.
 - A data não pode estar no passado. O período é `manha`, `tarde` ou `noite`.
 - O veículo precisa pertencer ao cliente, e o serviço precisa estar ativo. Ambos não mudam na edição.
@@ -107,18 +107,25 @@ Pré-requisitos: PHP 8.4+ e Composer. Docker é opcional, só para usar MySQL.
 
 ### Usuários criados pelo seeder
 
-| Perfil | E-mail | Senha |
+| Perfil | Login | Senha |
 |---|---|---|
-| Admin | `admin@aurum.com` | `12345678` |
+| Admin (fixo) | usuário `AdminA` | `AdminA` |
 | Cliente | `cliente@aurum.com` | `12345678` |
+| Cliente | `maria@aurum.com` | `12345678` |
 
-O seeder também cria 4 serviços, 3 mecânicos, 2 veículos do cliente e 2 agendamentos.
+O administrador fixo é criado pelo `AdminSeeder`, que pode ser rodado de novo a qualquer momento sem duplicar (`php artisan db:seed --class=AdminSeeder`). No login, o campo `login` aceita e-mail ou nome de usuário:
+
+```json
+{ "login": "AdminA", "password": "AdminA" }
+```
+
+O seeder também cria 4 serviços, 3 mecânicos, 3 veículos e 3 agendamentos pendentes (de dois clientes), prontos para o admin aceitar.
 
 ## Testando a API
 
 ### rest.http
 
-O arquivo [`rest.http`](rest.http) tem 26 requisições, em ordem, cobrindo login, CRUD de todos os recursos, segurança (401/403) e as regras de negócio (409/422). No VS Code, use a extensão **REST Client**: rode o item 01 e o 02 (logins) e depois os demais.
+O arquivo [`rest.http`](rest.http) tem 28 requisições, em ordem, cobrindo login, CRUD de todos os recursos, segurança (401/403) e as regras de negócio (409/422). No VS Code, use a extensão **REST Client**: rode o item 01 e o 02 (logins) e depois os demais.
 
 ### Testes automatizados
 
@@ -126,7 +133,7 @@ O arquivo [`rest.http`](rest.http) tem 26 requisições, em ordem, cobrindo logi
 php artisan test
 ```
 
-São 38 testes:
+São 43 testes:
 - `tests/Feature`: autenticação, CRUD, permissões e regras de negócio, via HTTP;
 - `tests/Unit`: regras do `AgendamentoService` com o repositório substituído por um mock.
 
@@ -134,7 +141,7 @@ São 38 testes:
 
 | Tabela | Campos principais | Relações |
 |---|---|---|
-| `users` | name, email, password, is_admin | 1:N veículos, 1:N agendamentos |
+| `users` | name, email, username (opcional, único), password, is_admin | 1:N veículos, 1:N agendamentos |
 | `veiculos` | marca, modelo, placa (única), ano | N:1 user · 1:N agendamentos |
 | `servicos` | nome, descricao, preco, duracao_minutos, ativo | 1:N agendamentos |
 | `mecanicos` | nome, especialidade, telefone, ativo | 1:N agendamentos |

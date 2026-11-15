@@ -10,7 +10,7 @@ interface AgendamentoRepositoryInterface extends BaseRepositoryInterface
     /**
      * Lista paginada. Com $userId, traz só os agendamentos daquele usuário.
      */
-    public function paginar(?int $userId, ?string $status, int $porPagina = 10): LengthAwarePaginator;
+    public function paginar(?int $userId, ?string $status, int $porPagina): LengthAwarePaginator;
 
     public function comRelacoes(Agendamento $agendamento): Agendamento;
 

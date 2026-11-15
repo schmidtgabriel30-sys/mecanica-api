@@ -74,13 +74,18 @@ class AgendamentoServiceTest extends TestCase
         $this->service->criar($this->cliente(), $this->dados() + ['mecanico_id' => 9]);
     }
 
-    public function test_nao_exclui_agendamento_concluido(): void
+    public function test_nao_exclui_agendamento_concluido_ou_em_atendimento(): void
     {
-        $agendamento = new Agendamento(['status' => Agendamento::CONCLUIDO]);
         $this->repo->shouldNotReceive('delete');
 
-        $this->expectException(RegraDeNegocioException::class);
-        $this->service->excluir($agendamento);
+        foreach ([Agendamento::CONCLUIDO, Agendamento::EM_ATENDIMENTO] as $status) {
+            try {
+                $this->service->excluir(new Agendamento(['status' => $status]));
+                $this->fail("Excluiu agendamento {$status}");
+            } catch (RegraDeNegocioException) {
+                $this->addToAssertionCount(1);
+            }
+        }
     }
 
     public function test_nao_altera_agendamento_cancelado(): void

@@ -20,7 +20,9 @@ class AuthController extends Controller
 
     public function login(LoginRequest $request): JsonResponse
     {
-        return response()->json($this->auth->login($request->validated('email'), $request->validated('password')));
+        $login = $request->validated('login') ?? $request->validated('email');
+
+        return response()->json($this->auth->login($login, $request->validated('password')));
     }
 
     public function logout(Request $request): Response

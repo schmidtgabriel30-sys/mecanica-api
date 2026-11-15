@@ -9,15 +9,18 @@ use Illuminate\Database\Eloquent\Builder;
 
 class AgendamentoRepository extends BaseRepository implements AgendamentoRepositoryInterface
 {
-    /** Relações carregadas junto com o agendamento nas respostas. */
-    private const RELACOES = ['veiculo', 'servico', 'mecanico'];
+    /**
+     * Relações carregadas junto com o agendamento nas respostas.
+     * "cliente" traz só id, nome e e-mail de quem solicitou.
+     */
+    private const RELACOES = ['veiculo', 'servico', 'mecanico', 'cliente:id,name,email'];
 
     public function __construct(Agendamento $model)
     {
         parent::__construct($model);
     }
 
-    public function paginar(?int $userId, ?string $status, int $porPagina = 10): LengthAwarePaginator
+    public function paginar(?int $userId, ?string $status, int $porPagina): LengthAwarePaginator
     {
         return Agendamento::with(self::RELACOES)
             ->when($userId, fn (Builder $q) => $q->where('user_id', $userId))

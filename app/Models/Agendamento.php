@@ -16,14 +16,19 @@ class Agendamento extends Model
 
     public const CONFIRMADO = 'confirmado';
 
+    public const EM_ATENDIMENTO = 'em_atendimento';
+
     public const CONCLUIDO = 'concluido';
 
     public const CANCELADO = 'cancelado';
 
-    public const STATUS = [self::PENDENTE, self::CONFIRMADO, self::CONCLUIDO, self::CANCELADO];
+    public const STATUS = [self::PENDENTE, self::CONFIRMADO, self::EM_ATENDIMENTO, self::CONCLUIDO, self::CANCELADO];
 
     /** Status que ainda ocupam a agenda (o serviço não terminou). */
-    public const STATUS_EM_ABERTO = [self::PENDENTE, self::CONFIRMADO];
+    public const STATUS_EM_ABERTO = [self::PENDENTE, self::CONFIRMADO, self::EM_ATENDIMENTO];
+
+    /** Status em que o agendamento não pode ser excluído. */
+    public const STATUS_NAO_EXCLUIVEIS = [self::EM_ATENDIMENTO, self::CONCLUIDO];
 
     /** Status finais: o agendamento não pode mais ser alterado. */
     public const STATUS_FINAIS = [self::CONCLUIDO, self::CANCELADO];
@@ -31,7 +36,8 @@ class Agendamento extends Model
     /** Para quais status cada status pode mudar. */
     public const TRANSICOES = [
         self::PENDENTE => [self::CONFIRMADO, self::CANCELADO],
-        self::CONFIRMADO => [self::CONCLUIDO, self::CANCELADO],
+        self::CONFIRMADO => [self::EM_ATENDIMENTO, self::CANCELADO],
+        self::EM_ATENDIMENTO => [self::CONCLUIDO],
         self::CONCLUIDO => [],
         self::CANCELADO => [],
     ];
@@ -52,6 +58,11 @@ class Agendamento extends Model
         return [
             'data_agendamento' => 'date:Y-m-d',
         ];
+    }
+
+    public function cliente(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     public function user(): BelongsTo
