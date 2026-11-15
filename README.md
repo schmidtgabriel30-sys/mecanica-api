@@ -4,7 +4,7 @@ API REST em **Laravel 13** para a oficina Aurum Automotive. Clientes cadastram s
 
 Projeto integrado das disciplinas de **Programação Orientada a Objetos para Web**, **Paradigmas de Linguagem de Programação** e **Programação para Dispositivos Móveis** (o app Flutter que consome esta API está em [aurum_lib](https://github.com/schmidtgabriel30-sys/aurum_lib)).
 
-**Aluno:** _[seu nome completo aqui]_
+**Aluno:** Gabriel Schmidt
 
 ## Recursos
 
